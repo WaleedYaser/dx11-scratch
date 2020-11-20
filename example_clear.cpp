@@ -79,9 +79,10 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         swapchain_desc.BufferDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
         swapchain_desc.SampleDesc.Count = 1;
         swapchain_desc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapchain_desc.BufferCount = 1;
+        swapchain_desc.BufferCount = 2;
         swapchain_desc.OutputWindow = hwnd;
         swapchain_desc.Windowed = TRUE;
+        swapchain_desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
         HRESULT result = D3D11CreateDeviceAndSwapChain(
             nullptr,
             D3D_DRIVER_TYPE_HARDWARE,
@@ -130,6 +131,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
                 break;
         }
 
+        // clear frame using red color
         float clear_color[4] = {1.0f, 0.0f, 0.0f, 1.0f};
         context->ClearRenderTargetView(render_target_view, clear_color);
         swapchain->Present(1, 0);
