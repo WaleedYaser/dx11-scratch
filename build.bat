@@ -24,16 +24,14 @@ if %DEBUG%==true (
     SET LINKER_FLAGS=/incremental:no /opt:ref
 )
 
-SET EXAMPLE_CLEAR_COMPILER_FLAGS=%COMPILER_FLAGS% /Fe: example_clear.exe /Fm: example_clear.map
-SET EXAMPLE_CLEAR_LINKER_FLAGS=%LINKER_FLAGS%
-SET EXAMPLE_CLEAR_SHARED_LIBS=
-cl %EXAMPLE_CLEAR_COMPILER_FLAGS% %ROOT_DIR%example_clear.cpp /link %EXAMPLE_CLEAR_LINKER_FLAGS% %EXAMPLE_CLEAR_SHARED_LIBS%
+for /r %%i in (..\*.cpp) do (
+    cl %COMPILER_FLAGS% "%%i" /link %LINKER_FLAGS%
+)
 
 SET ERR=%errorlevel%
 if %ERR%==0 (
-    echo Success!
+    echo success!
 )
-
 exit /b %ERR%
 
 popd
