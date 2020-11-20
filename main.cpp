@@ -1,3 +1,7 @@
+#pragma comment(lib, "user32.lib")
+#pragma comment(lib, "DXGI.lib")
+#pragma comment(lib, "D3D11.lib")
+
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <d3d11.h>

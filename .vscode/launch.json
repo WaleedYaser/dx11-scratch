@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "main",
+            "name": "example_clear",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/main.exe",
+            "program": "${workspaceFolder}/build/example_clear.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

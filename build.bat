@@ -16,7 +16,7 @@ SET BUILD_DIR=%ROOT_DIR%build\
 if not exist %BUILD_DIR% mkdir %BUILD_DIR%
 pushd %BUILD_DIR%
 
-if %DEBUG$==true (
+if %DEBUG%==true (
     SET COMPILER_FLAGS=/MTd /nologo /GR- /EHa /Od /Oi /WX /W4 /wd4201 /wd4100 /wd4109 /FC /Z7
     SET LINKER_FLAGS=/incremental:no /opt:ref
 ) else (
@@ -24,10 +24,10 @@ if %DEBUG$==true (
     SET LINKER_FLAGS=/incremental:no /opt:ref
 )
 
-SET MAIN_COMPILER_FLAGS=%COMPILER_FLAGS% /Fe: main.exe /Fm: main.map
-SET MAIN_LINKER_FLAGS=%LINKER_FLAGS%
-SET MAIN_SHARED_LIBS=user32.lib DXGI.lib D3D11.lib
-cl %MAIN_COMPILER_FLAGS% %ROOT_DIR%main.cpp /link %MAIN_LINKER_FLAGS% %MAIN_SHARED_LIBS%
+SET EXAMPLE_CLEAR_COMPILER_FLAGS=%COMPILER_FLAGS% /Fe: example_clear.exe /Fm: example_clear.map
+SET EXAMPLE_CLEAR_LINKER_FLAGS=%LINKER_FLAGS%
+SET EXAMPLE_CLEAR_SHARED_LIBS=
+cl %EXAMPLE_CLEAR_COMPILER_FLAGS% %ROOT_DIR%example_clear.cpp /link %EXAMPLE_CLEAR_LINKER_FLAGS% %EXAMPLE_CLEAR_SHARED_LIBS%
 
 SET ERR=%errorlevel%
 if %ERR%==0 (
