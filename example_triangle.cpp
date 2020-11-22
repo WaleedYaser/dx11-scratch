@@ -121,15 +121,16 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     ID3D11Buffer *vertex_buffer = nullptr;
     {
         float vertices[] = {
-             0.0f,  0.5f,
-             0.5f, -0.5f,
-            -0.5f, -0.5f
+            // position    color
+             0.0f,  0.5f, 1.0f, 0.0f, 0.0f,
+             0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
+            -0.5f, -0.5f, 0.0f, 0.0f, 1.0f
         };
 
         D3D11_BUFFER_DESC buffer_desc = {};
         buffer_desc.ByteWidth = sizeof(vertices);
         buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        buffer_desc.StructureByteStride = 2 * sizeof(float);
+        buffer_desc.StructureByteStride = 5 * sizeof(float);
 
         D3D11_SUBRESOURCE_DATA subresource_data = {};
         subresource_data.pSysMem = vertices;
@@ -148,14 +149,23 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     ID3D11PixelShader *pixel_shader = nullptr;
     {
         const char shader_src[] = R"(
-            float4 vs_main(float2 position : Position) : SV_Position
+            struct VS_Out
             {
-                return float4(position, 0, 1);
+                float3 color : Color;
+                float4 position : SV_Position;
+            };
+
+            VS_Out vs_main(float2 position : Position, float3 color : Color)
+            {
+                VS_Out output;
+                output.position = float4(position, 0, 1);
+                output.color = color;
+                return output;
             }
 
-            float4 ps_main() : SV_Target
+            float4 ps_main(float3 color : Color) : SV_Target
             {
-                return float4(1, 1, 1, 1);
+                return float4(color, 1);
             }
         )";
 
@@ -240,7 +250,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     ID3D11InputLayout *input_layout = nullptr;
     {
         D3D11_INPUT_ELEMENT_DESC input_element_desc[] = {
-            {"Position", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}
+            {"Position", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"Color", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
         };
 
         HRESULT result = device->CreateInputLayout(
@@ -290,7 +301,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         context->ClearRenderTargetView(render_target_view, clear_color);
 
         // set vertex buffer in input assempler stage
-        UINT stride = 2 * sizeof(float);
+        UINT stride = 5 * sizeof(float);
         UINT offset = 0;
         context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
         context->IASetInputLayout(input_layout);
