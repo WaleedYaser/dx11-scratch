@@ -54,7 +54,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     HWND hwnd = CreateWindowEx(
         0,
         L"dx11_wnd_class",
-        L"example triangle",
+        L"example rect",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
         nullptr,
@@ -117,29 +117,58 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         back_buffer->Release();
     }
 
-    // create vertices buffer
+    // create vertiex and index buffers
     ID3D11Buffer *vertex_buffer = nullptr;
+    ID3D11Buffer *index_buffer = nullptr;
     {
-        float vertices[] = {
-            // position    color
-             0.0f,  0.5f, 1.0f, 0.0f, 0.0f,
-             0.5f, -0.5f, 0.0f, 1.0f, 0.0f,
-            -0.5f, -0.5f, 0.0f, 0.0f, 1.0f
-        };
-
-        D3D11_BUFFER_DESC buffer_desc = {};
-        buffer_desc.ByteWidth = sizeof(vertices);
-        buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-        buffer_desc.StructureByteStride = 5 * sizeof(float);
-
-        D3D11_SUBRESOURCE_DATA subresource_data = {};
-        subresource_data.pSysMem = vertices;
-
-        HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &vertex_buffer);
-        if (FAILED(result))
+        // vertex buffer
         {
-            OutputDebugString(L"Failed to create vertex buffer");
-            return GetLastError();
+            float vertices[] = {
+                // position    color
+                -0.5f,  0.5f, 1.0f, 0.0f, 0.0f, // tl
+                 0.5f,  0.5f, 0.0f, 1.0f, 0.0f, // tr
+                 0.5f, -0.5f, 0.0f, 0.0f, 1.0f, // br
+                -0.5f, -0.5f, 1.0f, 0.0f, 1.0f  // bl
+            };
+
+            D3D11_BUFFER_DESC buffer_desc = {};
+            buffer_desc.ByteWidth = sizeof(vertices);
+            buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+            buffer_desc.StructureByteStride = 5 * sizeof(float);
+
+            D3D11_SUBRESOURCE_DATA subresource_data = {};
+            subresource_data.pSysMem = vertices;
+
+            HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &vertex_buffer);
+            if (FAILED(result))
+            {
+                OutputDebugString(L"Failed to create vertex buffer");
+                return GetLastError();
+            }
+        }
+        // index buffer
+        {
+            unsigned int indices[] = {
+                // clockwise
+                // first triangle: tl, tr, br
+                0, 1, 2,
+                // second triangle: tl, br, bl
+                0, 2, 3
+            };
+
+            D3D11_BUFFER_DESC buffer_desc = {};
+            buffer_desc.ByteWidth = sizeof(indices);
+            buffer_desc.BindFlags = D3D11_BIND_INDEX_BUFFER;
+
+            D3D11_SUBRESOURCE_DATA subresource_data = {};
+            subresource_data.pSysMem = indices;
+
+            HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &index_buffer);
+            if (FAILED(result))
+            {
+                OutputDebugString(L"Failed to create index buffer");
+                return GetLastError();
+            }
         }
     }
 
@@ -300,12 +329,15 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
         context->ClearRenderTargetView(render_target_view, clear_color);
 
-        // set vertex buffer in input assempler stage
+        // set layout and primitive
+        context->IASetInputLayout(input_layout);
+        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+        // set vertex and index buffer
         UINT stride = 5 * sizeof(float);
         UINT offset = 0;
         context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
-        context->IASetInputLayout(input_layout);
-        context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+        context->IASetIndexBuffer(index_buffer, DXGI_FORMAT_R32_UINT, 0);
 
         // set vertex and pixel shaders
         context->VSSetShader(vertex_shader, nullptr, 0);
@@ -318,7 +350,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         context->OMSetRenderTargets(1, &render_target_view, nullptr);
 
         // draw
-        context->Draw(3, 0);
+        context->DrawIndexed(6, 0, 0);
 
         swapchain->Present(1, 0);
     }
@@ -327,6 +359,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     input_layout->Release();
     pixel_shader->Release();
     vertex_shader->Release();
+    index_buffer->Release();
     vertex_buffer->Release();
     render_target_view->Release();
     context->Release();
