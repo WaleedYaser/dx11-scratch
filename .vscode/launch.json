@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "example_rect",
+            "name": "example_cbuffer",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/example_rect.exe",
+            "program": "${workspaceFolder}/build/example_cbuffer.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
