@@ -7,7 +7,6 @@
 #include <Windows.h>
 #include <d3d11.h>
 #include <d3dcompiler.h>
-#include <DirectXMath.h>
 
 #if defined(min)
 #undef min
@@ -16,6 +15,9 @@
 #if defined(max)
 #undef max
 #endif
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "external/stb_image.h"
 
 LRESULT CALLBACK
 window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
@@ -35,6 +37,28 @@ window_proc(HWND hwnd, UINT msg, WPARAM wparam, LPARAM lparam)
 int
 WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdShow)
 {
+    // set current directory to the executable directory
+    {
+        char module_path[512];
+        GetModuleFileNameA(0, module_path, sizeof(module_path));
+
+        char *last_slash = module_path;
+        char *iter = module_path;
+        while (*iter++)
+        {
+            if (*iter == '\\')
+                last_slash = ++iter;
+        }
+        *last_slash = '\0';
+
+        bool result = SetCurrentDirectoryA(module_path);
+        if (result == false)
+        {
+            OutputDebugString(L"Failed to set current directory\n");
+            return 1;
+        }
+    }
+
     // register window class
     {
         WNDCLASSEX wnd_class = {};
@@ -46,7 +70,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
 
         if (RegisterClassEx(&wnd_class) == 0)
         {
-            OutputDebugString(L"Failed to register window class");
+            OutputDebugString(L"Failed to register window class\n");
             return GetLastError();
         }
     }
@@ -55,7 +79,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     HWND hwnd = CreateWindowEx(
         0,
         L"dx11_wnd_class",
-        L"example cubes",
+        L"example texture",
         WS_OVERLAPPEDWINDOW | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT, CW_USEDEFAULT,
         nullptr,
@@ -68,12 +92,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         OutputDebugString(L"Failed to create window");
         return GetLastError();
     }
-
-    // get window width and height
-    RECT rect;
-    GetClientRect(hwnd, &rect);
-    int window_width = rect.right - rect.left;
-    int window_height = rect.bottom - rect.top;
 
     // create dx11 swapchain, device, and immediate context
     IDXGISwapChain *swapchain = nullptr;
@@ -108,7 +126,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         );
         if (FAILED(result))
         {
-            OutputDebugString(L"Failed to create device and swapchain");
+            OutputDebugString(L"Failed to create device and swapchain\n");
             return GetLastError();
         }
     }
@@ -124,39 +142,6 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         back_buffer->Release();
     }
 
-    // create depth target view
-    ID3D11DepthStencilView *depth_stencil_view = nullptr;
-    {
-        // create depth stencil texture
-        ID3D11Texture2D *depth_stencil;
-        {
-            D3D11_TEXTURE2D_DESC texture_desc = {};
-            texture_desc.Width = window_width;
-            texture_desc.Height = window_height;
-            texture_desc.MipLevels = 1;
-            texture_desc.ArraySize = 1;
-            texture_desc.Format = DXGI_FORMAT_D32_FLOAT;
-            texture_desc.SampleDesc.Count = 1;
-            texture_desc.BindFlags = D3D11_BIND_DEPTH_STENCIL;
-            HRESULT result = device->CreateTexture2D(&texture_desc, nullptr, &depth_stencil);
-            if (FAILED(result))
-            {
-                OutputDebugString(L"Failed to create device and swapchain");
-                return GetLastError();
-            }
-        }
-
-        // create depth stencil view
-        {
-            D3D11_DEPTH_STENCIL_VIEW_DESC view_desc = {};
-            view_desc.Format = DXGI_FORMAT_D32_FLOAT;
-            view_desc.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
-            device->CreateDepthStencilView(depth_stencil, &view_desc, &depth_stencil_view);
-        }
-
-        depth_stencil->Release();
-    }
-
     // create vertiex and index buffers
     ID3D11Buffer *vertex_buffer = nullptr;
     ID3D11Buffer *index_buffer = nullptr;
@@ -164,21 +149,17 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         // vertex buffer
         {
             float vertices[] = {
-                // position
-                -1.0f, -1.0f, -1.0f,
-                 1.0f, -1.0f, -1.0f,
-                -1.0f,  1.0f, -1.0f,
-                 1.0f,  1.0f, -1.0f,
-                -1.0f, -1.0f,  1.0f,
-                 1.0f, -1.0f,  1.0f,
-                -1.0f,  1.0f,  1.0f,
-                 1.0f,  1.0f,  1.0f
+                // position    uv
+                -0.5f,  0.5f,  0.0f, 0.0f, // tl
+                 0.5f,  0.5f,  1.0f, 0.0f, // tr
+                 0.5f, -0.5f,  1.0f, 1.0f, // br
+                -0.5f, -0.5f,  0.0f, 1.0f  // bl
             };
 
             D3D11_BUFFER_DESC buffer_desc = {};
             buffer_desc.ByteWidth = sizeof(vertices);
             buffer_desc.BindFlags = D3D11_BIND_VERTEX_BUFFER;
-            buffer_desc.StructureByteStride = 3 * sizeof(float);
+            buffer_desc.StructureByteStride = 4 * sizeof(float);
 
             D3D11_SUBRESOURCE_DATA subresource_data = {};
             subresource_data.pSysMem = vertices;
@@ -186,7 +167,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
             HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &vertex_buffer);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to create vertex buffer");
+                OutputDebugString(L"Failed to create vertex buffer\n");
                 return GetLastError();
             }
         }
@@ -194,12 +175,10 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         {
             unsigned int indices[] = {
                 // clockwise
-                0, 2, 3,  0, 3, 1,
-                1, 3, 7,  1, 7, 5,
-                5, 7, 6,  5, 6, 4,
-                4, 6, 2,  4, 2, 0,
-                2, 6, 7,  2, 7, 3,
-                0, 1, 5,  0, 5, 4
+                // first triangle: tl, tr, br
+                0, 1, 2,
+                // second triangle: tl, br, bl
+                0, 2, 3
             };
 
             D3D11_BUFFER_DESC buffer_desc = {};
@@ -212,9 +191,81 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
             HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &index_buffer);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to create index buffer");
+                OutputDebugString(L"Failed to create index buffer\n");
                 return GetLastError();
             }
+        }
+    }
+
+    // load image and create a 2d texture
+    ID3D11ShaderResourceView *texture_view = nullptr;
+    {
+        // load image
+        unsigned char * data = nullptr;
+        int img_width, img_height, img_channels;
+        {
+            data = stbi_load("data/uv_grid.jpg", &img_width, &img_height, &img_channels, 4);
+            if (data == nullptr)
+            {
+                OutputDebugString(L"Failed to load image\n");
+                return 1;
+            }
+        }
+
+        // craete texture
+        ID3D11Texture2D *texture = nullptr;
+        {
+            D3D11_TEXTURE2D_DESC texture_desc = {};
+            texture_desc.Width = img_width;
+            texture_desc.Height = img_height;
+            texture_desc.MipLevels = 1;
+            texture_desc.ArraySize = 1;
+            texture_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            texture_desc.SampleDesc.Count = 1;
+            texture_desc.BindFlags = D3D11_BIND_SHADER_RESOURCE;
+
+            D3D11_SUBRESOURCE_DATA subresource_data = {};
+            subresource_data.pSysMem = data;
+            subresource_data.SysMemPitch = img_width * 4;
+
+            HRESULT result = device->CreateTexture2D(&texture_desc, &subresource_data, &texture);
+            if (FAILED(result))
+            {
+                OutputDebugString(L"Failed to create texture 2d\n");
+                return GetLastError();
+            }
+        }
+        stbi_image_free(data);
+
+        // create texture view
+        {
+            D3D11_SHADER_RESOURCE_VIEW_DESC view_desc = {};
+            view_desc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+            view_desc.ViewDimension = D3D11_SRV_DIMENSION_TEXTURE2D;
+            view_desc.Texture2D.MipLevels = 1;
+            HRESULT result = device->CreateShaderResourceView(texture, &view_desc, &texture_view);
+            if (FAILED(result))
+            {
+                OutputDebugString(L"Failed to create render target view\n");
+                return GetLastError();
+            }
+        }
+        texture->Release();
+    }
+
+    // create sampler state
+    ID3D11SamplerState *sampler_state = nullptr;
+    {
+        D3D11_SAMPLER_DESC sampler_desc = {};
+        sampler_desc.Filter = D3D11_FILTER_MIN_MAG_MIP_LINEAR;
+        sampler_desc.AddressU = D3D11_TEXTURE_ADDRESS_WRAP;
+        sampler_desc.AddressV = D3D11_TEXTURE_ADDRESS_WRAP;
+        sampler_desc.AddressW = D3D11_TEXTURE_ADDRESS_WRAP;
+        HRESULT result = device->CreateSamplerState(&sampler_desc, &sampler_state);
+        if (FAILED(result))
+        {
+            OutputDebugString(L"Failed to create sampler state\n");
+            return GetLastError();
         }
     }
 
@@ -224,24 +275,26 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     ID3D11PixelShader *pixel_shader = nullptr;
     {
         const char shader_src[] = R"(
-            cbuffer Transform
+            struct VS_Out
             {
-                float4x4 mvp;
+                float2 uv : TexCoord;
+                float4 position : SV_Position;
             };
 
-            float4 vs_main(float3 position : Position) : SV_Position
+            VS_Out vs_main(float2 position : Position, float2 uv : TexCoord)
             {
-                return mul(float4(position, 1.0), mvp);
+                VS_Out output;
+                output.position = float4(position, 0, 1);
+                output.uv = uv;
+                return output;
             }
 
-            cbuffer Colors
-            {
-                float4 colors[6];
-            };
+            Texture2D tex;
+            SamplerState tex_sampler;
 
-            float4 ps_main(uint id: SV_PrimitiveID) : SV_Target
+            float4 ps_main(float2 uv : TexCoord) : SV_Target
             {
-                return colors[id / 2];
+                return tex.Sample(tex_sampler, uv);
             }
         )";
 
@@ -262,7 +315,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
                 &error_blob);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to compile vertex shader");
+                OutputDebugString(L"Failed to compile vertex shader\n");
                 OutputDebugStringA((char *)error_blob->GetBufferPointer());
                 return GetLastError();
             }
@@ -286,7 +339,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
                 &error_blob);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to compile pixel shader");
+                OutputDebugString(L"Failed to compile pixel shader\n");
                 OutputDebugStringA((char *)error_blob->GetBufferPointer());
                 return GetLastError();
             }
@@ -301,7 +354,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
                 &vertex_shader);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to create vertex shader");
+                OutputDebugString(L"Failed to create vertex shader\n");
                 return GetLastError();
             }
         }
@@ -315,7 +368,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
                 &pixel_shader);
             if (FAILED(result))
             {
-                OutputDebugString(L"Failed to create pixel shader");
+                OutputDebugString(L"Failed to create pixel shader\n");
                 return GetLastError();
             }
             pixel_shader_blob->Release();
@@ -326,7 +379,8 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     ID3D11InputLayout *input_layout = nullptr;
     {
         D3D11_INPUT_ELEMENT_DESC input_element_desc[] = {
-            {"Position", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0}
+            {"Position", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0},
+            {"TexCoord", 0, DXGI_FORMAT_R32G32_FLOAT, 0, D3D11_APPEND_ALIGNED_ELEMENT, D3D11_INPUT_PER_VERTEX_DATA, 0}
         };
 
         HRESULT result = device->CreateInputLayout(
@@ -336,7 +390,7 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
             vertex_shader_blob->GetBufferSize(), &input_layout);
         if (FAILED(result))
         {
-            OutputDebugString(L"Failed to create input layout");
+            OutputDebugString(L"Failed to create input layout\n");
             return GetLastError();
         }
         vertex_shader_blob->Release();
@@ -345,83 +399,17 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
     // create viewport
     D3D11_VIEWPORT viewport = {};
     {
+        // get window width and height
+        RECT rect;
+        GetClientRect(hwnd, &rect);
+        int window_width = rect.right - rect.left;
+        int window_height = rect.bottom - rect.top;
+
         viewport.Width = (float)window_width;
         viewport.Height = (float)window_height;
-        viewport.MinDepth = 0.0f;
-        viewport.MaxDepth = 1.0f;
     }
-
-    // create dynamic transform and static colors constant buffers
-    ID3D11Buffer *transform_cbuffer = nullptr;
-    ID3D11Buffer *colors_cbuffer = nullptr;
-    {
-        // create transform buffer, dynamic as we will update it every frame
-        {
-            D3D11_BUFFER_DESC buffer_desc = {};
-            buffer_desc.ByteWidth = sizeof(DirectX::XMMATRIX);
-            buffer_desc.Usage = D3D11_USAGE_DYNAMIC;
-            buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-            buffer_desc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-            HRESULT result = device->CreateBuffer(&buffer_desc, nullptr, &transform_cbuffer);
-            if (FAILED(result))
-            {
-                OutputDebugString(L"Failed to create transform constant buffer");
-                return GetLastError();
-            }
-        }
-        // create colors buffer, static we won't update it every frame
-        {
-            float colors[] = {
-                1.0f, 0.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 0.0f, 1.0f, 1.0f,
-                1.0f, 1.0f, 0.0f, 1.0f,
-                0.0f, 1.0f, 1.0f, 1.0f,
-                1.0f, 0.0f, 1.0f, 1.0f
-            };
-
-            D3D11_BUFFER_DESC buffer_desc = {};
-            buffer_desc.ByteWidth = sizeof(colors);
-            buffer_desc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-
-            D3D11_SUBRESOURCE_DATA subresource_data = {};
-            subresource_data.pSysMem = colors;
-
-            HRESULT result = device->CreateBuffer(&buffer_desc, &subresource_data, &colors_cbuffer);
-            if (FAILED(result))
-            {
-                OutputDebugString(L"Failed to create colors constant buffer");
-                return GetLastError();
-            }
-        }
-    }
-
-    // create depth stencil state
-    ID3D11DepthStencilState *depth_stencil_state = nullptr;
-    {
-        D3D11_DEPTH_STENCIL_DESC depth_stencil_desc = {};
-        depth_stencil_desc.DepthEnable = TRUE;
-        depth_stencil_desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
-        depth_stencil_desc.DepthFunc = D3D11_COMPARISON_LESS;
-
-        HRESULT result = device->CreateDepthStencilState(&depth_stencil_desc, &depth_stencil_state);
-        if (FAILED(result))
-        {
-            OutputDebugString(L"Failed to create constant buffer");
-            return GetLastError();
-        }
-    }
-
-    // create projection matrix
-    DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(
-        DirectX::XMConvertToRadians(60.0f),
-        viewport.Width / viewport.Height,
-        0.1f,
-        100.0f);
 
     // msg loop
-    float angle = 0.0f;
     bool running = true;
     while (running)
     {
@@ -440,14 +428,13 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         // clear frame using red color
         float clear_color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
         context->ClearRenderTargetView(render_target_view, clear_color);
-        context->ClearDepthStencilView(depth_stencil_view, D3D11_CLEAR_DEPTH, 1.0f, 1);
 
         // set layout and primitive
         context->IASetInputLayout(input_layout);
         context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
         // set vertex and index buffer
-        UINT stride = 3 * sizeof(float);
+        UINT stride = 4 * sizeof(float);
         UINT offset = 0;
         context->IASetVertexBuffers(0, 1, &vertex_buffer, &stride, &offset);
         context->IASetIndexBuffer(index_buffer, DXGI_FORMAT_R32_UINT, 0);
@@ -456,71 +443,30 @@ WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR pCmdLine, int nCmdSho
         context->VSSetShader(vertex_shader, nullptr, 0);
         context->PSSetShader(pixel_shader, nullptr, 0);
 
-        // set constant buffers
-        context->VSSetConstantBuffers(0, 1, &transform_cbuffer);
-        context->PSSetConstantBuffers(0, 1, &colors_cbuffer);
+        // set texture and sampler
+        context->PSSetShaderResources(0, 1, &texture_view);
+        context->PSSetSamplers(0, 1, &sampler_state);
 
         // set viewport
         context->RSSetViewports(1, &viewport);
 
         // set render target and viewport
-        context->OMSetRenderTargets(1, &render_target_view, depth_stencil_view);
+        context->OMSetRenderTargets(1, &render_target_view, nullptr);
 
-        // set depth stencil state
-        context->OMSetDepthStencilState(depth_stencil_state, 1);
-
-        // update first cube transform constant buffer
-        {
-            angle += (1.0f / 60.0f);
-            DirectX::XMMATRIX mvp = DirectX::XMMatrixTranspose(
-                DirectX::XMMatrixRotationX(angle) *
-                DirectX::XMMatrixRotationY(angle) *
-                DirectX::XMMatrixRotationZ(angle) *
-                DirectX::XMMatrixTranslation(0.0f, 0.0f, 5.0f) *
-                proj
-            );
-
-            D3D11_MAPPED_SUBRESOURCE mapped_subresource = {};
-            context->Map(transform_cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_subresource);
-            memcpy(mapped_subresource.pData, &mvp, sizeof(mvp));
-            context->Unmap(transform_cbuffer, 0);
-        }
-
-        // draw first cube
-        context->DrawIndexed(36, 0, 0);
-
-        // update second cube transform constant buffer
-        {
-            DirectX::XMMATRIX mvp = DirectX::XMMatrixTranspose(
-                DirectX::XMMatrixRotationX(angle / 2.0f) *
-                DirectX::XMMatrixRotationY(angle / 2.0f) *
-                DirectX::XMMatrixRotationZ(angle / 2.0f) *
-                DirectX::XMMatrixTranslation(0.0f, 0.0f, 5.0f) *
-                proj
-            );
-
-            D3D11_MAPPED_SUBRESOURCE mapped_subresource = {};
-            context->Map(transform_cbuffer, 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped_subresource);
-            memcpy(mapped_subresource.pData, &mvp, sizeof(mvp));
-            context->Unmap(transform_cbuffer, 0);
-        }
-
-        // draw second cube
-        context->DrawIndexed(36, 0, 0);
+        // draw
+        context->DrawIndexed(6, 0, 0);
 
         swapchain->Present(1, 0);
     }
 
     // release resources
-    depth_stencil_state->Release();
-    colors_cbuffer->Release();
-    transform_cbuffer->Release();
     input_layout->Release();
     pixel_shader->Release();
     vertex_shader->Release();
     index_buffer->Release();
     vertex_buffer->Release();
-    depth_stencil_view->Release();
+    sampler_state->Release();
+    texture_view->Release();
     render_target_view->Release();
     context->Release();
     device->Release();

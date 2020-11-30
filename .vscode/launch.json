@@ -5,10 +5,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "example_cubes",
+            "name": "example_texture",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/build/example_cubes.exe",
+            "program": "${workspaceFolder}/build/example_texture.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",

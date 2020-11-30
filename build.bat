@@ -28,11 +28,13 @@ for /r %%i in (..\*.cpp) do (
     cl %COMPILER_FLAGS% "%%i" /link %LINKER_FLAGS%
 )
 
-SET ERR=%errorlevel%
-if %ERR%==0 (
-    echo success!
-)
-exit /b %ERR%
+XCOPY /y %ROOT_DIR%data\ %BUILD_DIR%data\
+
+@REM SET ERR=%errorlevel%
+@REM if %ERR%==0 (
+@REM     echo success!
+@REM )
+@REM exit /b %ERR%
 
 popd
 
